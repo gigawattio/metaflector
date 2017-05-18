@@ -16,6 +16,10 @@ To be precise, this package currently provides:
 
 * Iterating over a struct or slice / array object's fields
 
+#### Note about current limitations
+
+For heterogeneous collections (i.e. possible via `[]interface{}`), only the structure of the first non-nil slice or array element will be considered.
+
 ### Requirements
 
 * Go version 1.6 or newer
@@ -65,6 +69,8 @@ Output:
 ```
 []string{"Bar.ID", "Name"}
 ```
+
+See the [tests](https://github.com/gigawattio/metaflect/blob/master/terminal_fields_test.go#L56-L100) for more examples.
 
 ### Related Work
 

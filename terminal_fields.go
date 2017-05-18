@@ -66,45 +66,26 @@ type IterFunc func(child interface{}, name string, kind reflect.Kind)
 // resolved to a struct or non-empty slice / array (i.e. if must be a
 // non-terminal type).
 func EachField(obj interface{}, fn IterFunc) (ok bool) {
-	if obj == nil {
-		return
-	}
-	if isPointer(obj) {
-		v := reflect.ValueOf(obj)
-		if v.IsNil() {
-			// Can't do deep inspection on nil values.
-			return
-		}
-		obj = reflect.Indirect(v).Interface()
-	}
-	if hasType(obj, []reflect.Kind{reflect.Slice, reflect.Array}) {
-		v := reflect.ValueOf(obj)
-		if v.Len() == 0 {
-			return
-		}
-		obj = v.Index(0).Interface()
-	}
-	if obj == nil || !isStruct(obj) {
+	if obj, ok = ResolveUnderlying(obj); !ok || obj == nil {
+		ok = false
 		return
 	}
 
 	v := reflect.ValueOf(obj)
 
 	for i := 0; i < v.NumField(); i++ {
-		field := v.Field(i)
-		t := v.Type()
-
 		// Skip unexported (signaled by non-mepty pkgpath) or anonymous fields.
-		if structField := t.Field(i); structField.PkgPath != "" || structField.Anonymous {
+		if sf := v.Type().Field(i); sf.PkgPath != "" || sf.Anonymous {
 			continue
 		}
 
 		var (
-			name = v.Type().Field(i).Name
-			kind = field.Kind()
+			field = v.Field(i)
+			name  = v.Type().Field(i).Name
+			kind  = field.Kind()
 		)
 
-		if kind == reflect.Ptr {
+		for kind == reflect.Ptr {
 			// Resolve underlying pointer type.
 			kind = field.Type().Elem().Kind()
 		}
@@ -114,9 +95,9 @@ func EachField(obj interface{}, fn IterFunc) (ok bool) {
 			fn(field.Interface(), name, kind)
 
 		case reflect.Slice, reflect.Array:
-			if field.Len() > 0 {
-				EachField(field.Index(0).Interface(), func(child interface{}, childName string, childKind reflect.Kind) {
-					fn(child, name+"."+childName, childKind)
+			if firstObj, ok := ResolveUnderlying(field.Interface()); ok {
+				EachField(firstObj, func(child interface{}, childName string, childKind reflect.Kind) {
+					fn(child, name+Separator+childName, childKind)
 				})
 			}
 
@@ -129,21 +110,84 @@ func EachField(obj interface{}, fn IterFunc) (ok bool) {
 	return
 }
 
+// ResolveUnderlying takes an interface{} (object) and resolves it to an
+// instance of the underlying type through 3 varieties of resolution mutation:
+//
+// 1. Pointers are resolved to whatever they're referencing.
+//
+// 2. Slices and arrays, when not empty, are resolved to the type of the first
+// element.
+//
+// 3. Test if the end result is a struct.
+func ResolveUnderlying(obj interface{}) (resolved interface{}, ok bool) {
+	if obj, ok = resolvePointer(obj); !ok {
+		return
+	}
+
+	if hasType(obj, []reflect.Kind{reflect.Slice, reflect.Array}) {
+		v := reflect.ValueOf(obj)
+		if v.Len() == 0 {
+			return
+		}
+		obj = nil
+		// Find first non-nil element.
+		for i := 0; i < v.Len(); i++ {
+			if value := v.Index(i); isStruct(value.Interface()) || !value.IsNil() {
+				obj = value.Interface()
+				break
+			}
+		}
+	}
+
+	if obj, ok = resolvePointer(obj); !ok {
+		return
+	}
+
+	if !isStruct(obj) {
+		ok = false
+		return
+	}
+
+	resolved = obj
+	ok = true
+	return
+}
+
+// resolvePointer keeps digging until it can't inspect any further or a
+// non-pointer is unearthed.
+func resolvePointer(obj interface{}) (interface{}, bool) {
+	for isPointer(obj) {
+		v := reflect.ValueOf(obj)
+		if v.IsNil() {
+			// Can't do further inspection on nil values.
+			return nil, false
+		}
+		obj = reflect.Indirect(v).Interface()
+	}
+	if obj == nil {
+		return nil, false
+	}
+	return obj, true
+}
+
 func isPointer(obj interface{}) bool {
+	if obj == nil {
+		return false
+	}
 	return reflect.TypeOf(obj).Kind() == reflect.Ptr
 }
 
 func isStruct(obj interface{}) bool {
+	if obj == nil {
+		return false
+	}
 	return reflect.TypeOf(obj).Kind() == reflect.Struct
 }
 
-// isTerminal returns true if the supplied reflect.Kind is a terminal (i.e.
-// primitive) type with no additional sub-fields (e.g. an int, bool, string).
-func isTerminal(kind reflect.Kind) bool {
-	return kind != reflect.Struct && kind != reflect.Slice && kind != reflect.Array
-}
-
 func hasType(obj interface{}, types []reflect.Kind) bool {
+	if obj == nil {
+		return false
+	}
 	for _, t := range types {
 		if reflect.TypeOf(obj).Kind() == t {
 			return true
@@ -151,4 +195,10 @@ func hasType(obj interface{}, types []reflect.Kind) bool {
 	}
 
 	return false
+}
+
+// isTerminal returns true if the supplied reflect.Kind is a terminal (i.e.
+// primitive) type with no additional sub-fields (e.g. an int, bool, string).
+func isTerminal(kind reflect.Kind) bool {
+	return kind != reflect.Struct && kind != reflect.Slice && kind != reflect.Array
 }
