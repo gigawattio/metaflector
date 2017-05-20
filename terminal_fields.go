@@ -1,4 +1,4 @@
-package metaflect
+package metaflector
 
 import (
 	"reflect"

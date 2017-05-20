@@ -1,20 +1,22 @@
-# metaflect
+# metaflector
 
-[![Documentation](https://godoc.org/github.com/gigawattio/metaflect?status.svg)](https://godoc.org/github.com/gigawattio/metaflect)
-[![Build Status](https://travis-ci.org/gigawattio/metaflect.svg?branch=master)](https://travis-ci.org/gigawattio/metaflect)
-[![Report Card](https://goreportcard.com/badge/github.com/gigawattio/metaflect)](https://goreportcard.com/report/github.com/gigawattio/metaflect)
+[![Documentation](https://godoc.org/github.com/gigawattio/metaflector?status.svg)](https://godoc.org/github.com/gigawattio/metaflector)
+[![Build Status](https://travis-ci.org/gigawattio/metaflector.svg?branch=master)](https://travis-ci.org/gigawattio/metaflector)
+[![Report Card](https://goreportcard.com/badge/github.com/gigawattio/metaflector)](https://goreportcard.com/report/github.com/gigawattio/metaflector)
 
 ### About
 
 Go (golang) package which provides reflection abstractions beyond the Go standard library.
 
-Metaflect makes it easy to inspect objects and structs, and programmatically access structural metadata.
+Metaflector makes it easy to inspect objects and structs, and programmatically access structural metadata.
 
 To be precise, this package currently provides:
 
 * Generating a dot-separated list of struct hierarchy
 
 * Iterating over a struct or slice / array object's fields
+
+See the [docs](https://godoc.org/github.com/gigawattio/metaflector) for more info.
 
 #### Note about current limitations
 
@@ -36,7 +38,7 @@ package main
 import (
     "fmt"
 
-    "github.com/gigawattio/metaflect"
+    "github.com/gigawattio/metaflector"
 )
 
 type (
@@ -60,7 +62,7 @@ var foo = &Foo{
 }
 
 func main() {
-    fmt.Printf("%# v\n", metaflect.TerminalFields(foo))
+    fmt.Printf("%# v\n", metaflector.TerminalFields(foo))
 }
 ```
 
@@ -70,7 +72,7 @@ Output:
 []string{"Bar.ID", "Name"}
 ```
 
-See the [tests](https://github.com/gigawattio/metaflect/blob/master/terminal_fields_test.go#L56-L100) for more examples.
+See the [tests](https://github.com/gigawattio/metaflector/blob/master/terminal_fields_test.go#L56-L100) for more examples.
 
 ### Related Work
 
