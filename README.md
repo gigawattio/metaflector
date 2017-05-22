@@ -16,11 +16,15 @@ To be precise, this package currently provides:
 
 * Iterating over a struct or slice / array object's fields
 
+I've found this functionality useful for automatically applying user input as search filters against arbitrary structs.
+
 See the [docs](https://godoc.org/github.com/gigawattio/metaflector) for more info.
 
-#### Note about current limitations
+#### A word about current limitations
 
-For heterogeneous collections (i.e. possible via `[]interface{}`), only the structure of the first non-nil slice or array element will be considered.
+* For heterogeneous collections (i.e. this is possible via `[]interface{}`), only the structure of the first non-nil slice or array element will be considered.
+
+* No maps support _[yet]_.
 
 ### Requirements
 
@@ -31,6 +35,8 @@ For heterogeneous collections (i.e. possible via `[]interface{}`), only the stru
     go test ./...
 
 ### Example Usage
+
+[examples/basic.go](examples/basic.go)
 
 ```go
 package main
@@ -43,19 +49,19 @@ import (
 
 type (
     Foo struct {
-        Bar Bar
+        Bar  Bar
         Name string
     }
 
     Bar struct {
-        ID string
+        ID      string
         private string
     }
 )
 
 var foo = &Foo{
     Bar: Bar{
-        ID: "2017",
+        ID:      "2017",
         private: "this isn't exported",
     },
     Name: "meta",
@@ -63,6 +69,7 @@ var foo = &Foo{
 
 func main() {
     fmt.Printf("%# v\n", metaflector.TerminalFields(foo))
+    fmt.Printf("Bar.ID resolved to: %v\n", metaflector.Get(foo, "Bar.ID"))
 }
 ```
 
@@ -70,6 +77,7 @@ Output:
 
 ```
 []string{"Bar.ID", "Name"}
+Bar.ID resolved to: 2017
 ```
 
 See the [tests](https://github.com/gigawattio/metaflector/blob/master/terminal_fields_test.go#L56-L100) for more examples.
