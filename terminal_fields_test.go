@@ -28,6 +28,7 @@ type Baz struct {
 	Contents          []Content
 	ContentPtrs       []*Content
 	PtrContentPtrPtrs *[]**Content
+	Map               map[string]string
 	PtrA              *uint8
 	PtrB              *int64
 	hiddenString      string
@@ -92,6 +93,7 @@ func TestTerminalFields(t *testing.T) {
 				"Bar.Baz.Contents.Key",
 				"Bar.Baz.Contents.Value",
 				"Bar.Baz.Contents.Version",
+				"Bar.Baz.Map",
 				"Bar.Baz.Multiplier",
 				"Bar.Baz.Name",
 				"Bar.Baz.PtrA",
@@ -122,12 +124,14 @@ func TestTerminalFields(t *testing.T) {
 				"Bar.Baz.ContentPtrs.Key",
 				"Bar.Baz.ContentPtrs.Value",
 				"Bar.Baz.ContentPtrs.Version",
+				"Bar.Baz.Map",
 				"Bar.Baz.Multiplier",
 				"Bar.Baz.Name",
 				"Bar.Baz.PtrA",
 				"Bar.Baz.PtrB",
 				"Bar.Stock",
 				"StructPtr.Baz.Active",
+				"StructPtr.Baz.Map",
 				"StructPtr.Baz.Multiplier",
 				"StructPtr.Baz.Name",
 				"StructPtr.Baz.PtrA",
@@ -152,6 +156,7 @@ func TestTerminalFields(t *testing.T) {
 			},
 			expected: []string{
 				"Bar.Baz.Active",
+				"Bar.Baz.Map",
 				"Bar.Baz.Multiplier",
 				"Bar.Baz.Name",
 				"Bar.Baz.PtrA",
@@ -161,6 +166,7 @@ func TestTerminalFields(t *testing.T) {
 				"Bar.Baz.PtrContentPtrPtrs.Version",
 				"Bar.Stock",
 				"StructPtr.Baz.Active",
+				"StructPtr.Baz.Map",
 				"StructPtr.Baz.Multiplier",
 				"StructPtr.Baz.Name",
 				"StructPtr.Baz.PtrA",
@@ -180,32 +186,127 @@ func TestTerminalFields(t *testing.T) {
 			)
 			if len(missing.ToSlice()) == 0 && len(extra.ToSlice()) == 0 {
 				t.Errorf("[i=%v] Improper field ordering detected", i)
-				t.Errorf("[i=%v] expected=%v", i, expected)
-				t.Errorf("[i=%v]   actual=%v", i, actual)
+				t.Errorf("[i=%v] expected=%# v", i, expected)
+				t.Errorf("[i=%v]   actual=%# v", i, actual)
 			} else {
 				t.Errorf("[i=%v] Expected fields mismatch; missing=%v extra=%v", i, missing, extra)
-				t.Errorf("[i=%v] expected=%v", i, expected)
-				t.Errorf("[i=%v]   actual=%v", i, actual)
+				t.Errorf("[i=%v] expected=%# v", i, expected)
+				t.Errorf("[i=%v]   actual=%# v", i, actual)
 			}
 		}
 	}
 }
 
 func TestEachField(t *testing.T) {
-	tests := []interface{}{
-		false,
-		true,
-		"hotdog",
-		"not hotdog",
-		3,
-		3.3,
-		&threeve,
-		'c',
+	{
+		tests := []interface{}{
+			false,
+			true,
+			"hotdog",
+			"not hotdog",
+			3,
+			3.3,
+			&threeve,
+			'c',
+		}
+
+		for i, test := range tests {
+			if ok := EachField(test, func(_ interface{}, _ string, _ reflect.Kind) {}); ok {
+				t.Errorf("[i=%v] 'ok' should have been false but actual=%v for test=%# v", i, ok, test)
+			}
+		}
 	}
 
-	for i, test := range tests {
-		if ok := EachField(test, func(_ interface{}, _ string, _ reflect.Kind) {}); ok {
-			t.Errorf("[i=%v] 'ok' should have been false but actual=%v", i, ok)
+	{
+		tests := []struct {
+			obj      interface{}
+			expected map[string]interface{}
+		}{
+			{
+				obj: Content{
+					Key:     "myKey",
+					Value:   "myValue",
+					Version: 99,
+				},
+				expected: map[string]interface{}{
+					"Key":     "myKey",
+					"Value":   "myValue",
+					"Version": int64(99),
+				},
+			},
+			{
+				obj: Bar{
+					Baz: Baz{
+						Active: true,
+					},
+					Stock: "room",
+				},
+				expected: map[string]interface{}{
+					"Baz": Baz{
+						Active: true,
+					},
+					"Stock": "room",
+				},
+			},
+			{
+				obj: []Content{
+					Content{
+						Key:     "a",
+						Value:   "b",
+						Version: 3,
+					},
+				},
+				expected: map[string]interface{}{
+					"Key":     "a",
+					"Value":   "b",
+					"Version": int64(3),
+				},
+			},
+			{
+				obj: []Content{
+					Content{
+						Key:     "d",
+						Value:   "e",
+						Version: 6,
+					},
+					Content{
+						Key:     "a",
+						Value:   "b",
+						Version: 3,
+					},
+				},
+				expected: map[string]interface{}{
+					"Key":     "d",
+					"Value":   "e",
+					"Version": int64(6),
+				},
+			},
+		}
+
+		for i, test := range tests {
+			remaining := map[string]interface{}{}
+
+			for k, v := range test.expected {
+				remaining[k] = v
+			}
+
+			fn := func(obj interface{}, name string, kind reflect.Kind) {
+				if _, ok := remaining[name]; !ok {
+					t.Errorf("[i=%v] Received unexpected name=%v value=%[2]T/%[2]v test=%# v", i, name, obj, test)
+				} else if !reflect.DeepEqual(obj, remaining[name]) {
+					t.Errorf("[i=%v] Value mismatch for field=%v expected=%[3]T/%[3]v actual=%[4]T/%[4]v test=%# v", i, name, remaining[name], obj, test)
+				} else {
+					delete(remaining, name)
+				}
+			}
+
+			if ok := EachField(test.obj, fn); !ok {
+				t.Errorf("[i=%v] 'ok' should have been true but actual=%v for test=%# v", i, ok, test)
+			}
+
+			if expected, actual := 0, len(remaining); expected != actual {
+				t.Errorf("[i=%v] Expected len(remaining)=%v but actual=%v, contents=%+v test=%# v", i, expected, actual, remaining, test)
+			}
 		}
 	}
 }
@@ -656,10 +757,28 @@ func TestGet(t *testing.T) {
 				int64(4),
 			},
 		},
+		{
+			obj: struct {
+				Foo *Foo
+			}{
+				Foo: &Foo{
+					Bar: Bar{
+						Baz: Baz{
+							Map: map[string]string{
+								"mKey": "mValue",
+							},
+						},
+					},
+				},
+			},
+			path: "Foo.Bar.Baz.Map",
+			expected: map[string]string{
+				"mKey": "mValue",
+			},
+		},
 	}
 
 	for i, test := range tests {
-		t.Logf("Starting %v", i)
 		if expected, actual := test.expected, Get(test.obj, test.path); !reflect.DeepEqual(actual, expected) {
 			t.Errorf("[i=%v] Expected value=%[2]T/%[2]v but actual=%[3]T/%[3]v for test=%# v", i, expected, actual, test)
 		}

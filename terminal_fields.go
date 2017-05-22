@@ -102,8 +102,8 @@ func EachField(obj interface{}, fn IterFunc) (ok bool) {
 				})
 			}
 
-		case reflect.String, reflect.Float32, reflect.Float64, reflect.Bool, reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-			fn(nil, name, kind)
+		case reflect.String, reflect.Float32, reflect.Float64, reflect.Bool, reflect.Map, reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+			fn(unreflect(field), name, kind)
 		}
 	}
 
