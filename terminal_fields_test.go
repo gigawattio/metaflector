@@ -7,6 +7,9 @@ import (
 	"github.com/deckarep/golang-set"
 )
 
+// Sample structs for testing.
+// Try not to think too hard about them.
+
 type Foo struct {
 	Bar       Bar
 	StructPtr *Bar
@@ -41,6 +44,7 @@ type Content struct {
 
 var (
 	threeve      = int64(3)
+	uEight       = uint8(8)
 	notHotdogPtr = &Content{
 		Key:   "not",
 		Value: "hotdog",
@@ -395,4 +399,269 @@ func toIfaces(src []string) []interface{} {
 		ifaces[i] = s
 	}
 	return ifaces
+}
+
+func TestGet(t *testing.T) {
+	tests := []struct {
+		obj      interface{}
+		path     string
+		expected interface{}
+	}{
+		{},
+		{
+			obj:      "",
+			expected: "",
+		},
+		{
+			obj:      "foo",
+			expected: "foo",
+		},
+		{
+			obj:      true,
+			expected: true,
+		},
+		{
+			obj:      5,
+			expected: 5,
+		},
+		{
+			obj:      5.59,
+			expected: 5.59,
+		},
+		{
+			obj:      map[string]string{},
+			expected: map[string]string{},
+		},
+		{
+			obj:      map[string]string{},
+			path:     "Foo",
+			expected: nil,
+		},
+		{
+			obj: Content{
+				Key:     "test1",
+				Value:   "v1",
+				Version: 99,
+			},
+			path:     "Key",
+			expected: "test1",
+		},
+		{
+			obj: &Content{
+				Key:     "test1",
+				Value:   "v1",
+				Version: 99,
+			},
+			path:     "Key",
+			expected: "test1",
+		},
+		{
+			obj: []Content{
+				{
+					Key:     "test1",
+					Value:   "v1",
+					Version: 99,
+				},
+			},
+			path:     "Key",
+			expected: []interface{}{"test1"},
+		},
+		{
+			obj: []*Content{
+				&Content{
+					Key:     "test1",
+					Value:   "v1",
+					Version: 99,
+				},
+			},
+			path:     "Key",
+			expected: []interface{}{"test1"},
+		},
+		{
+			obj: []*Content{
+				nil,
+				&Content{
+					Key:     "test1",
+					Value:   "v1",
+					Version: 99,
+				},
+			},
+			path:     "Key",
+			expected: []interface{}{"test1"},
+		},
+		{
+			obj: []*Content{
+				nil,
+				&Content{
+					Key:     "test1",
+					Value:   "v1",
+					Version: 99,
+				},
+				&Content{
+					Key:     "test2",
+					Value:   "v2",
+					Version: 100,
+				},
+			},
+			path:     "Key",
+			expected: []interface{}{"test1", "test2"},
+		},
+		{
+			obj: [][]*Content{
+				[]*Content{
+					nil,
+					&Content{
+						Key:   "test1",
+						Value: "v1",
+					},
+					&Content{
+						Key:   "test2",
+						Value: "v2",
+					},
+				},
+				[]*Content{
+					nil,
+					&Content{
+						Key:   "test3",
+						Value: "v3",
+					},
+					&Content{
+						Key:   "test4",
+						Value: "v4",
+					},
+				},
+			},
+			path: "Key",
+			expected: []interface{}{
+				[]interface{}{"test1", "test2"},
+				[]interface{}{"test3", "test4"},
+			},
+		},
+		{
+			obj: [][]*Content{
+				[]*Content{
+					nil,
+					&Content{
+						Key:   "test1",
+						Value: "v1",
+					},
+					&Content{
+						Key:   "test2",
+						Value: "v2",
+					},
+				},
+				[]*Content{
+					nil,
+					&Content{
+						Key:   "test3",
+						Value: "v3",
+					},
+					&Content{
+						Key:   "test4",
+						Value: "v4",
+					},
+				},
+			},
+			path: "Key",
+			expected: []interface{}{
+				[]interface{}{"test1", "test2"},
+				[]interface{}{"test3", "test4"},
+			},
+		},
+		{
+			obj: Foo{
+				Bar: Bar{
+					Baz: Baz{
+						Name: "Nested",
+					},
+				},
+			},
+			path:     "Bar.Baz.Name",
+			expected: "Nested",
+		},
+		{
+			obj: Foo{
+				StructPtr: &Bar{
+					Stock: "back",
+				},
+			},
+			path:     "StructPtr.Stock",
+			expected: "back",
+		},
+		{
+			obj: Foo{
+				Bar: Bar{
+					Baz: Baz{
+						PtrA: &uEight,
+					},
+				},
+			},
+			path:     "Bar.Baz.PtrA",
+			expected: &uEight,
+		},
+		{
+			obj: Foo{
+				Bar: Bar{
+					Baz: Baz{
+						PtrB: &threeve,
+					},
+				},
+			},
+			path:     "Bar.Baz.PtrB",
+			expected: &threeve,
+		},
+		{
+			obj:  Foo{},
+			path: "Bar.Baz.PtrB",
+			expected: func() interface{} {
+				// NB: This is to return the "right type" of nil (*int64).
+				// See also: https://stackoverflow.com/a/43059772/293064
+				var x *int64
+				return x
+			}(),
+		},
+		{
+			obj: Foo{
+				StructPtr: &Bar{
+					Stock: "back",
+				},
+			},
+			path:     "StructPtr.Stock",
+			expected: "back",
+		},
+		{
+			obj: struct {
+				Foo *Foo
+			}{
+				Foo: &Foo{
+					Bar: Bar{
+						Baz: Baz{
+							ContentPtrs: []*Content{
+								&Content{Version: 1},
+								&Content{Version: 5},
+								&Content{Version: 3},
+								&Content{Version: 2},
+								&Content{Version: 4},
+							},
+						},
+					},
+				},
+			},
+			path: "Foo.Bar.Baz.ContentPtrs.Version",
+			expected: []interface{}{
+				int64(1),
+				int64(5),
+				int64(3),
+				int64(2),
+				int64(4),
+			},
+		},
+	}
+
+	for i, test := range tests {
+		t.Logf("Starting %v", i)
+		if expected, actual := test.expected, Get(test.obj, test.path); !reflect.DeepEqual(actual, expected) {
+			t.Errorf("[i=%v] Expected value=%[2]T/%[2]v but actual=%[3]T/%[3]v for test=%# v", i, expected, actual, test)
+		}
+	}
 }

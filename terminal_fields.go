@@ -3,6 +3,7 @@ package metaflector
 import (
 	"reflect"
 	"sort"
+	"strings"
 )
 
 // Separator is the string to use as the delimiter between field names.
@@ -201,4 +202,125 @@ func hasType(obj interface{}, types []reflect.Kind) bool {
 // primitive) type with no additional sub-fields (e.g. an int, bool, string).
 func isTerminal(kind reflect.Kind) bool {
 	return kind != reflect.Struct && kind != reflect.Slice && kind != reflect.Array
+}
+
+// Get the specified dot-path value by digging down and extracting from each
+// component of the dot-path.
+func Get(obj interface{}, dotPath string) interface{} {
+	stack := strings.Split(dotPath, Separator)
+	for len(stack) > 0 {
+		// Pop off front name.
+		obj = getAttr(obj, stack[0])
+		stack = stack[1:]
+
+		switch obj.(type) {
+		case []interface{}:
+			var (
+				objs      = obj.([]interface{})
+				out       = []interface{}{}
+				remainder = strings.Join(stack, Separator)
+			)
+			for _, obj = range objs {
+				out = append(out, Get(obj, remainder))
+			}
+			obj = out
+			return obj
+		}
+	}
+	return obj
+}
+
+func getAttr(obj interface{}, name string) interface{} {
+	if name == "" {
+		return obj
+	}
+	var ok bool
+	if obj, ok = resolvePointer(obj); !ok {
+		return nil
+	}
+
+	v := reflect.ValueOf(obj)
+
+	switch v.Kind() {
+	case reflect.Map:
+		return nil
+
+	case reflect.Slice, reflect.Array:
+		out := []interface{}{}
+		eachElement(v, func(_ int, ele reflect.Value) {
+			if ok {
+				if obj, ok = resolvePointer(obj); !ok {
+					return
+				}
+				if kind := ele.Kind(); kind == reflect.Struct || kind == reflect.Slice || kind == reflect.Array || !ele.IsNil() {
+					out = append(out, getAttr(unreflect(ele), name))
+				}
+			}
+		})
+		if !ok {
+			return nil
+		}
+		obj = out
+		return obj
+	}
+
+	var (
+		field = v.FieldByName(name)
+		kind  = field.Kind()
+	)
+
+	if reflect.DeepEqual(field, reflect.Value{}) {
+		return nil
+	}
+
+	switch kind {
+	case reflect.Slice, reflect.Array:
+		out := []interface{}{}
+		eachElement(field, func(_ int, ele reflect.Value) {
+			if ok {
+				if obj, ok = resolvePointer(obj); !ok {
+					return
+				}
+				if isStruct(obj) || !ele.IsNil() {
+					out = append(out, ele.Interface())
+				}
+			}
+		})
+		obj = out
+	default:
+		obj = unreflect(field)
+	}
+
+	return obj
+}
+
+// eachElement invokes the callback func on each sub-element of an array or
+// slice.  NB: It's the callers responsibility to ensure this isn't invoked on a
+// non-slice or non-array value type.
+func eachElement(v reflect.Value, fn func(i int, ele reflect.Value)) {
+	for i := 0; i < v.Len(); i++ {
+		ele := v.Index(i)
+		fn(i, ele)
+	}
+}
+
+// Turns a reflect.Value back into it's original value.
+func unreflect(v reflect.Value) (obj interface{}) {
+	switch v.Kind() {
+	case reflect.String:
+		obj = v.String()
+	case reflect.Float32, reflect.Float64:
+		obj = v.Float()
+	case reflect.Bool:
+		obj = v.Bool()
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		obj = v.Int()
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		obj = v.Uint()
+	default:
+		if v.CanInterface() {
+			obj = v.Interface()
+		}
+	}
+	return
 }
