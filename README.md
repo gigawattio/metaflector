@@ -49,6 +49,8 @@ I've found this functionality useful for automatically applying user input as se
 
 See the [docs](https://godoc.org/github.com/gigawattio/metaflector) for more info.
 
+Created by [Jay Taylor](https://jaytaylor.com/) and used by [Gigawatt](https://gigawatt.io/).
+
 #### A word about current limitations
 
 * For heterogeneous collections (i.e. this is possible via `[]interface{}`), only the structure of the first non-nil slice or array element will be considered.
